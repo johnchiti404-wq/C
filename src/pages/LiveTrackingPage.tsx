@@ -152,7 +152,6 @@ export const LiveTrackingPage: React.FC = () => {
   const [showRouteOverlay, setShowRouteOverlay] = useState(false);
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const gpsListenerRef = useRef<(() => void) | null>(null);
-  const driverListenerRef = useRef<(() => void) | null>(null);
 
   // Listen to order document in real-time
   // IMPORTANT: Driver info MUST come from the order document's "driver" field
@@ -172,6 +171,13 @@ export const LiveTrackingPage: React.FC = () => {
         const normalized: OrderData = { ...data, id: orderId };
         if (!normalized.storeLocation && typeof pickupLat === 'number' && typeof pickupLng === 'number') {
           normalized.storeLocation = { lat: pickupLat, lng: pickupLng };
+        }
+        // Map flat dropLat/dropLng → destinationLocation so the destination
+        // marker renders and fitBounds has two points to frame the route.
+        const dropLat = (data as any).dropLat;
+        const dropLng = (data as any).dropLng;
+        if (!normalized.destinationLocation && typeof dropLat === 'number' && typeof dropLng === 'number') {
+          normalized.destinationLocation = { lat: dropLat, lng: dropLng };
         }
         setOrderData(normalized);
         
@@ -353,36 +359,6 @@ export const LiveTrackingPage: React.FC = () => {
       }
     };
   }, [orderId]);
-
-  // Listen to driver document for real-time location updates ONLY
-  // IMPORTANT: Driver info comes from the order document, NOT from drivers collection
-  // This listener is ONLY for live GPS location updates
-  useEffect(() => {
-    if (!orderData.driverId) return;
-
-    const driverRef = doc(db, 'drivers', orderData.driverId);
-    const unsubscribe = onSnapshot(driverRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        // ONLY update location - driver info comes from order document
-        if (data.location) {
-          setDriverLocation({
-            lat: data.location.lat || data.location.latitude,
-            lng: data.location.lng || data.location.longitude,
-          });
-        }
-        // DO NOT update driverData here - it must come from order document
-      }
-    });
-
-    driverListenerRef.current = unsubscribe;
-
-    return () => {
-      if (driverListenerRef.current) {
-        driverListenerRef.current();
-      }
-    };
-  }, [orderData.driverId]);
 
   const handleCall = () => {
     if (driverData?.phone) {

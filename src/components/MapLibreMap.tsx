@@ -423,7 +423,13 @@ export const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (driverPosition) {
         bounds.extend([driverPosition.lng, driverPosition.lat]);
       }
-      map.current.fitBounds(bounds, { padding: 80, maxZoom: 15 });
+      // Asymmetric padding: the draggable bottom panel covers the lower half of
+      // the map, so reserve extra space at the bottom to keep the route + the
+      // pickup ETA bubble (start of the polyline) within the visible area.
+      map.current.fitBounds(bounds, {
+        padding: { top: 120, bottom: 380, left: 80, right: 80 },
+        maxZoom: 15
+      });
     }
   }, [markers, isMapLoaded, fitBounds, driverPosition]);
 
@@ -478,7 +484,13 @@ export const MapLibreMap: React.FC<MapLibreMapProps> = ({
         coordinates.forEach(coord => {
           bounds.extend(coord as [number, number]);
         });
-        map.current.fitBounds(bounds, { padding: 80, maxZoom: 15 });
+        // Asymmetric padding to account for the draggable bottom panel covering
+        // the lower half of the map — keeps the pickup end (polyline start) and
+        // its ETA bubble visible instead of hidden behind the panel.
+        map.current.fitBounds(bounds, {
+          padding: { top: 120, bottom: 380, left: 80, right: 80 },
+          maxZoom: 15
+        });
       }
     } catch (error) {
       console.error('Error decoding polyline:', error);

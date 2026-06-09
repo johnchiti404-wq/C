@@ -119,6 +119,9 @@ export const DriverComing: React.FC<DriverComingProps> = ({
   const [firestoreRideData, setFirestoreRideData] = useState<any>(null);
   const gpsListenerRef = useRef<(() => void) | null>(null);
   const orderListenerRef = useRef<(() => void) | null>(null);
+  // Guards setting driver info exactly once without putting driverInfo in the
+  // effect deps (which would tear down and re-subscribe the listeners mid-flight).
+  const driverInfoSetRef = useRef(false);
 
   const finalDestination = isService 
     ? orderData.destinationAddress 
