@@ -423,7 +423,10 @@ export const MapLibreMap: React.FC<MapLibreMapProps> = ({
       if (driverPosition) {
         bounds.extend([driverPosition.lng, driverPosition.lat]);
       }
-      map.current.fitBounds(bounds, { padding: 80, maxZoom: 15 });
+    map.current.fitBounds(bounds, {
+  padding: { top: 120, bottom: 380, left: 80, right: 80 },
+  maxZoom: 15
+});
     }
   }, [markers, isMapLoaded, fitBounds, driverPosition]);
 
