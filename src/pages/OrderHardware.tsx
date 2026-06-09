@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ShoppingCart, Plus, X, CheckCircle } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Plus, Minus } from 'lucide-react';
 import { useGlobalCart } from '../contexts/GlobalCartContext';
+import { CrossStoreModal } from '../components/CrossStoreModal';
 import { fetchStoreById, fetchProductsByStore } from '../services/storeService';
 import { Product } from '../data/storesData';
 
@@ -33,13 +34,14 @@ const ProductSkeletonCard: React.FC<{ index: number }> = ({ index }) => (
 export const OrderHardware: React.FC = () => {
   const { storeId } = useParams<{ storeId: string }>();
   const navigate = useNavigate();
-  const { cart, addToCart, removeFromCart } = useGlobalCart();
+  const { cart, addToCart, decrementProduct, getProductCount, clearCart, blockedStoreAttempt, clearBlockedAttempt } = useGlobalCart();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [storeName, setStoreName] = useState('');
   const [storeAddress, setStoreAddress] = useState('');
   const [loading, setLoading] = useState(true);
-  const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
+  // Product the user tried to add when blocked by the cross-store guard
+  const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     const loadStoreData = async () => {
@@ -77,30 +79,40 @@ export const OrderHardware: React.FC = () => {
   const cartCount = cart.length;
   const cartTotal = cart.reduce((sum, item) => sum + item.price, 0);
 
-  const isInCart = (productId: string) => {
-    return cart.some(item => item.id.startsWith(productId));
-  };
+  const buildCartItem = (product: Product) => ({
+    id: `${product.id}-${Date.now()}`,
+    storeId: storeId!,
+    storeName: storeName,
+    storeAddress: storeAddress,
+    category: 'hardware' as const,
+    name: product.name,
+    image: product.imageUrl,
+    price: product.price,
+  });
 
   const handleAddToCart = (product: Product) => {
-    addToCart({
-      id: `${product.id}-${Date.now()}`,
-      storeId: storeId!,
-      storeName: storeName,
-      storeAddress: storeAddress,
-      category: 'hardware',
-      name: product.name,
-      image: product.imageUrl,
-      price: product.price
-    });
-    setRecentlyAdded(product.id);
-    setTimeout(() => setRecentlyAdded(null), 500);
+    const added = addToCart(buildCartItem(product));
+    if (!added) setPendingProduct(product);
   };
 
-  const handleRemoveFromCart = (productId: string) => {
-    const itemToRemove = cart.find(item => item.id.startsWith(productId));
-    if (itemToRemove) {
-      removeFromCart(itemToRemove.id);
+  const handleDecrement = (productId: string) => {
+    decrementProduct(productId);
+  };
+
+  // User chose to clear the cart in the cross-store modal — clear then add the pending item
+  const handleClearAndAdd = () => {
+    clearCart();
+    clearBlockedAttempt();
+    if (pendingProduct) {
+      const product = pendingProduct;
+      setPendingProduct(null);
+      setTimeout(() => addToCart(buildCartItem(product)), 0);
     }
+  };
+
+  const handleCancelBlocked = () => {
+    clearBlockedAttempt();
+    setPendingProduct(null);
   };
 
   const handleCompleteOrder = () => {
@@ -220,8 +232,7 @@ export const OrderHardware: React.FC = () => {
       >
         <div className="grid grid-cols-2 gap-4">
           {products.map((product) => {
-            const isAdded = isInCart(product.id);
-            const wasJustAdded = recentlyAdded === product.id;
+            const count = getProductCount(product.id);
 
             return (
               <motion.div
@@ -229,8 +240,8 @@ export const OrderHardware: React.FC = () => {
                 variants={itemVariants}
                 whileTap={{ scale: 0.98 }}
                 className={`bg-white rounded-lg overflow-hidden shadow-sm transition-all ${
-                  wasJustAdded ? 'ring-2 ring-amber-500' : ''
-                } ${isAdded ? 'ring-2 ring-amber-400' : ''}`}
+                  count > 0 ? 'ring-2 ring-amber-400' : ''
+                }`}
               >
                 <div className="relative h-32 bg-gray-200 overflow-hidden">
                   <img
@@ -238,13 +249,13 @@ export const OrderHardware: React.FC = () => {
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />
-                  {isAdded && (
+                  {count > 0 && (
                     <motion.div
-                      className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute top-2 right-2 bg-amber-600 text-white text-xs font-bold rounded-full min-w-[24px] h-6 px-1.5 flex items-center justify-center shadow"
                     >
-                      <CheckCircle size={32} className="text-amber-400" />
+                      {count}
                     </motion.div>
                   )}
                 </div>
@@ -264,20 +275,32 @@ export const OrderHardware: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    {!isAdded ? (
+                    {count === 0 ? (
                       <button
                         onClick={() => handleAddToCart(product)}
                         className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-amber-500 text-white hover:bg-amber-600"
+                        aria-label={`Add ${product.name}`}
                       >
                         <Plus size={16} />
                       </button>
                     ) : (
-                      <button
-                        onClick={() => handleRemoveFromCart(product.id)}
-                        className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-red-500 text-white hover:bg-red-600"
-                      >
-                        <X size={16} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleDecrement(product.id)}
+                          className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300"
+                          aria-label={`Remove one ${product.name}`}
+                        >
+                          <Minus size={16} />
+                        </button>
+                        <span className="text-sm font-bold text-gray-900 w-4 text-center">{count}</span>
+                        <button
+                          onClick={() => handleAddToCart(product)}
+                          className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-amber-500 text-white hover:bg-amber-600"
+                          aria-label={`Add one ${product.name}`}
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -313,6 +336,15 @@ export const OrderHardware: React.FC = () => {
           </motion.div>
         )}
       </div>
+
+      <CrossStoreModal
+        open={!!blockedStoreAttempt}
+        currentStoreName={blockedStoreAttempt?.currentStoreName || ''}
+        attemptedStoreName={blockedStoreAttempt?.attemptedStoreName || ''}
+        onClearCart={handleClearAndAdd}
+        onCancel={handleCancelBlocked}
+        accentClassName="bg-amber-600 hover:bg-amber-700"
+      />
     </motion.div>
   );
 };

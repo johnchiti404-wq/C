@@ -8,6 +8,7 @@ import { RatingModal } from '../components/RatingModal';
 import { MapLibreMap, MapMarker } from '../components/MapLibreMap';
 import { listenToDriverLocation } from '../services/trackingService';
 import { trimPolylineFromPosition } from '../utils/polylineUtils';
+import { useGlobalCart } from '../contexts/GlobalCartContext';
 
 interface OrderItem {
   name: string;
@@ -136,6 +137,7 @@ export const LiveTrackingPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { orderId, orderData: initialOrderData } = location.state || {};
+  const { clearCart } = useGlobalCart();
 
   const [orderData, setOrderData] = useState<OrderData>(initialOrderData || {});
   const [driverData, setDriverData] = useState<DriverData | null>(null);
@@ -305,6 +307,8 @@ export const LiveTrackingPage: React.FC = () => {
           setStatusTitle('Order Delivered');
           setStatusSubtitle('Enjoy your order');
           if (gpsListenerRef.current) { gpsListenerRef.current(); gpsListenerRef.current = null; }
+          // Order finished — empty the global cart
+          clearCart();
         }
 
         // ── ARRIVED ──────────────────────────────────────────────────────
@@ -322,6 +326,8 @@ export const LiveTrackingPage: React.FC = () => {
           setShowRouteOverlay(false);
           setEtaMinutes(null);
           if (gpsListenerRef.current) { gpsListenerRef.current(); gpsListenerRef.current = null; }
+          // Order finished — empty the global cart
+          clearCart();
           setTimeout(() => setShowRatingModal(true), 1000);
         }
 

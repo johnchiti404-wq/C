@@ -234,8 +234,7 @@ export const OrderFoodies: React.FC = () => {
       >
         <div className="grid grid-cols-2 gap-4">
           {products.map((product) => {
-            const isAdded = isInCart(product.id);
-            const wasJustAdded = recentlyAdded === product.id;
+            const count = getProductCount(product.id);
 
             return (
               <motion.div
@@ -243,8 +242,8 @@ export const OrderFoodies: React.FC = () => {
                 variants={itemVariants}
                 whileTap={{ scale: 0.98 }}
                 className={`bg-white rounded-lg overflow-hidden shadow-sm transition-all ${
-                  wasJustAdded ? 'ring-2 ring-green-500' : ''
-                } ${isAdded ? 'ring-2 ring-green-400' : ''}`}
+                  count > 0 ? 'ring-2 ring-green-400' : ''
+                }`}
               >
                 <div className="relative h-32 bg-gray-200 overflow-hidden">
                   <img
@@ -252,13 +251,13 @@ export const OrderFoodies: React.FC = () => {
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />
-                  {isAdded && (
+                  {count > 0 && (
                     <motion.div
-                      className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute top-2 right-2 bg-green-600 text-white text-xs font-bold rounded-full min-w-[24px] h-6 px-1.5 flex items-center justify-center shadow"
                     >
-                      <CheckCircle size={32} className="text-green-400" />
+                      {count}
                     </motion.div>
                   )}
                 </div>
@@ -278,20 +277,32 @@ export const OrderFoodies: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    {!isAdded ? (
+                    {count === 0 ? (
                       <button
                         onClick={() => handleAddToCart(product)}
                         className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-green-500 text-white hover:bg-green-600"
+                        aria-label={`Add ${product.name}`}
                       >
                         <Plus size={16} />
                       </button>
                     ) : (
-                      <button
-                        onClick={() => handleRemoveFromCart(product.id)}
-                        className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-red-500 text-white hover:bg-red-600"
-                      >
-                        <X size={16} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleDecrement(product.id)}
+                          className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300"
+                          aria-label={`Remove one ${product.name}`}
+                        >
+                          <Minus size={16} />
+                        </button>
+                        <span className="text-sm font-bold text-gray-900 w-4 text-center">{count}</span>
+                        <button
+                          onClick={() => handleAddToCart(product)}
+                          className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-green-500 text-white hover:bg-green-600"
+                          aria-label={`Add one ${product.name}`}
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -327,6 +338,15 @@ export const OrderFoodies: React.FC = () => {
           </motion.div>
         )}
       </div>
+
+      <CrossStoreModal
+        open={!!blockedStoreAttempt}
+        currentStoreName={blockedStoreAttempt?.currentStoreName || ''}
+        attemptedStoreName={blockedStoreAttempt?.attemptedStoreName || ''}
+        onClearCart={handleClearAndAdd}
+        onCancel={handleCancelBlocked}
+        accentClassName="bg-green-600 hover:bg-green-700"
+      />
     </motion.div>
   );
 };
